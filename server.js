@@ -1,40 +1,66 @@
-import express from "express";
-import eventRoutes from "./src/routes/eventRoutes.js";
-import { logger, validateEventInput, measureTime, errorHandler } from "./src/middleware.js";
+﻿import express from "express";
 
 const app = express();
-const PORT = 3000;
+const PORT = 3001;  // Changed from 3000
+const API_VERSION = "v1";
 
 app.use(express.json());
-app.use(logger);
-app.use(measureTime);
+
+let events = [
+  { id: 1, title: "JavaScript Workshop", date: "2026-02-15T10:00:00Z", location: "Sfax", capacity: 30, attendees: 15, status: "upcoming" },
+  { id: 2, title: "React Conference", date: "2026-03-20T14:00:00Z", location: "Tunis", capacity: 100, attendees: 45, status: "upcoming" }
+];
+let nextId = 3;
+
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
 
 app.get("/", (req, res) => {
-  res.json({ message: "Event Manager API (MVC)", version: "1.0.0" });
+  res.json({ name: "Event Manager API", version: "1.0.0" });
 });
 
-const validateEvent = (req, res, next) => {
-  if (req.method === "POST" || req.method === "PUT") {
-    validateEventInput(req, res, next);
-  } else {
-    next();
-  }
-};
+app.get(`/api/${API_VERSION}/events`, (req, res) => {
+  res.json({ success: true, data: events, count: events.length });
+});
 
-app.use("/api/events", validateEvent);
-app.use("/api/events", eventRoutes);
+app.get(`/api/${API_VERSION}/events/:id`, (req, res) => {
+  const event = events.find(e => e.id === parseInt(req.params.id));
+  if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+  res.json({ success: true, data: event });
+});
+
+app.post(`/api/${API_VERSION}/events`, (req, res) => {
+  const { title, date, location, capacity } = req.body;
+  if (!title || !date || !location || !capacity) {
+    return res.status(400).json({ success: false, message: "Missing required fields" });
+  }
+  const newEvent = { id: nextId++, title, date, location, capacity: parseInt(capacity), attendees: 0, status: "upcoming", createdAt: new Date().toISOString() };
+  events.push(newEvent);
+  res.status(201).json({ success: true, data: newEvent });
+});
+
+app.put(`/api/${API_VERSION}/events/:id`, (req, res) => {
+  const index = events.findIndex(e => e.id === parseInt(req.params.id));
+  if (index === -1) return res.status(404).json({ success: false, message: "Event not found" });
+  events[index] = { ...events[index], ...req.body };
+  res.json({ success: true, data: events[index] });
+});
+
+app.delete(`/api/${API_VERSION}/events/:id`, (req, res) => {
+  const index = events.findIndex(e => e.id === parseInt(req.params.id));
+  if (index === -1) return res.status(404).json({ success: false, message: "Event not found" });
+  events.splice(index, 1);
+  res.status(204).send();
+});
 
 app.get("/health", (req, res) => {
-  res.json({ status: "✅ healthy", uptime: process.uptime().toFixed(2) + "s" });
+  res.json({ status: "healthy", timestamp: new Date().toISOString() });
 });
-
-app.use((req, res) => {
-  res.status(404).json({ success: false, message: `Non trouvé : ${req.method} ${req.path}` });
-});
-
-app.use(errorHandler);
 
 app.listen(PORT, () => {
-  console.log(`\n✅ Event Manager API (MVC) démarrée`);
-  console.log(`📍 http://localhost:${PORT}\n`);
+  console.log(`\n🚀 Server running at http://localhost:${PORT}`);
+  console.log(`🔗 API: http://localhost:${PORT}/api/${API_VERSION}/events`);
+  console.log(`💚 Health: http://localhost:${PORT}/health\n`);
 });

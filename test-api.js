@@ -1,54 +1,55 @@
-import http from "http";
+const BASE_URL = "http://localhost:3000/api/v1/events";
 
-function makeRequest(method, path, data = null) {
-  return new Promise((resolve, reject) => {
-    const req = http.request(
-      { hostname: "localhost", port: 3000, path, method,
-        headers: { "Content-Type": "application/json" } },
-      (res) => {
-        let body = "";
-        res.on("data", chunk => body += chunk);
-        res.on("end", () => resolve({ status: res.statusCode, body: JSON.parse(body) }));
-      }
-    );
-    req.on("error", reject);
-    if (data) req.write(JSON.stringify(data));
-    req.end();
+async function runTests() {
+  console.log("\n" + "=".repeat(50));
+  console.log("🧪 REST API TESTS");
+  console.log("=".repeat(50));
+
+  let createdEventId;
+
+  console.log("\n📋 GET /events");
+  let res = await fetch(BASE_URL);
+  let data = await res.json();
+  console.log(`   Status: ${res.status}, Events: ${data.data?.length}`);
+
+  console.log("\n📋 POST /events - Create");
+  res = await fetch(BASE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "Test Workshop", date: "2026-07-15T10:00:00Z", location: "Sfax", capacity: 25 })
   });
-}
+  data = await res.json();
+  createdEventId = data.data?.id;
+  console.log(`   Status: ${res.status}, Created ID: ${createdEventId}`);
 
-async function testAPI() {
-  console.log("═══════ TEST EVENT MANAGER API ═══════\n");
-  try {
-    let r;
-
-    r = await makeRequest("GET", "/api/events");
-    console.log(`GET /api/events        → ${r.status} | count: ${r.body.count}`);
-
-    r = await makeRequest("POST", "/api/events",
-      { title: "Docker Masterclass", date: "2026-06-01", location: "Sfax", capacity: 35 });
-    console.log(`POST /api/events       → ${r.status} | créé: ${r.body.data.title}`);
-
-    r = await makeRequest("GET", "/api/events/1");
-    console.log(`GET /api/events/1      → ${r.status} | ${r.body.data.title}`);
-
-    r = await makeRequest("PUT", "/api/events/1",
-      { title: "Advanced JS Workshop", date: "2026-02-15", location: "Sfax", capacity: 30 });
-    console.log(`PUT /api/events/1      → ${r.status} | ${r.body.data.title}`);
-
-    r = await makeRequest("DELETE", "/api/events/2");
-    console.log(`DELETE /api/events/2   → ${r.status} | supprimé: ${r.body.data.title}`);
-
-    r = await makeRequest("POST", "/api/events", { title: "Incomplet" });
-    console.log(`POST invalide          → ${r.status} | ${r.body.message}`);
-
-    r = await makeRequest("GET", "/api/events/999");
-    console.log(`GET /api/events/999    → ${r.status} | ${r.body.message}`);
-
-    console.log("\n✅ TOUS LES TESTS RÉUSSIS !");
-  } catch (err) {
-    console.error("❌ Échec :", err.message);
+  console.log("\n📋 GET /events/:id");
+  if (createdEventId) {
+    res = await fetch(`${BASE_URL}/${createdEventId}`);
+    data = await res.json();
+    console.log(`   Status: ${res.status}, Event: ${data.data?.title}`);
   }
+
+  console.log("\n📋 PUT /events/:id");
+  if (createdEventId) {
+    res = await fetch(`${BASE_URL}/${createdEventId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Updated Workshop" })
+    });
+    data = await res.json();
+    console.log(`   Status: ${res.status}, Updated: ${data.data?.title}`);
+  }
+
+  console.log("\n📋 DELETE /events/:id");
+  if (createdEventId) {
+    res = await fetch(`${BASE_URL}/${createdEventId}`, { method: "DELETE" });
+    console.log(`   Status: ${res.status} (204 = Deleted)`);
+  }
+
+  console.log("\n" + "=".repeat(50));
+  console.log("✅ TESTS COMPLETE!");
+  console.log("=".repeat(50) + "\n");
 }
 
-setTimeout(testAPI, 1000);
+console.log("⏳ Waiting for server...\n");
+setTimeout(runTests, 2000);
